@@ -5,26 +5,13 @@ title: "Continuous Integration"
 Sentry uses a variety of continuous integration services to help ensure we don't
 accidentally break the application.
 
+## Deployments
+
+[GoCD](https://deploy.getsentry.net) is used for deployments. Please refer to the [internal user guide](https://www.notion.so/sentry/GoCD-User-Guide-4f8456d2477c458095c4aa0e67fc38a6).
+
 ## GitHub Actions
 
 GitHub actions is our primary CI system and runs our tests on every pull request and on merges to master. It is required that tests pass before changes can be merged.
-
-## Freight
-
-Freight is how we deploy our applications to staging & production.
-
-### Reverting / Rolling Back After a Bad Deploy
-
-If you've deployed something bad, you'll need to do the following:
-
-- Deploy the most recently known good commit that succeeded ASAP. Keep an eye on
-  this as deploys MUST finish, otherwise it's possible some web machines will
-  still be stuck on the bad deploy's code.
-- Inform #team-engineering that you're rolling back a bad deploy, and that no
-  one should deploy getsentry master until the issue is resolved.
-- Fix the issue, and get it merged into master.
-- Deploy the fix, and verify that the issue has indeed been fixed.
-- Inform #team-engineering that it is safe to deploy getsentry again.
 
 ## Docker images
 

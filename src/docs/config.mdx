@@ -42,7 +42,7 @@ system.admin-email: "admin@example.com"
 
 <ConfigValue name="system.url-prefix" location="yaml"><markdown>
 
-The URL prefix in which Sentry is accessible. This will be used both for referencing URLs in the UI, as well as in outbound notifications. This only works for scheme, hostname and port. In particular, it does _not_ work for path (we supported this years ago, but it became too difficult to maintain). Sentry needs to be at the root of its own (sub)domain or IP address.
+The URL prefix in which Sentry is accessible. This will be used both for referencing URLs in the UI, as well as in outbound notifications. This only works for scheme, hostname and port. Sentry needs to be at the root of its own (sub)domain or IP address, and you cannot include path information (not even a trailing slash) in the `system.url-prefix` option.
 
 ```yaml
 system.url-prefix: "https://sentry.example.com"
@@ -68,7 +68,7 @@ sentry config generate-secret-key
 
 ## Logging
 
-Sentry logs to two major places — `stdout`, and its internal project. To disable logging to the internal project, add a logger whose only handler is `'console'` and disable propagating upwards.
+Sentry logs to two major places — `stdout`, and its internal project in Sentry. By default, all levels of logs are printed to the console, but only `error` level logs are captured and sent to Sentry. To disable logging to the internal project (in other words, to prevent the server's built-in SDK instance from sending events to Sentry), add a logger whose only handler is `'console'` and which has `propagate` set to `False`.
 
 <Alert level="warning">
 You will find the CLI flag and the environment variables related to logging below. They override the
@@ -80,7 +80,7 @@ in a production system, because the Celery logger can be extremely verbose when 
 
 Sentry can override logger levels by providing the CLI with the `-l/--loglevel` flag.
 
-The value of this can be one of the [standard Python logging level strings](https://docs.python.org/2/library/logging.html#levels).
+The value of this can be one of the [standard Python logging level strings](https://docs.python.org/3/library/logging.html#logging-levels).
 
 ```shell
 sentry --loglevel=WARNING
@@ -92,7 +92,7 @@ sentry --loglevel=WARNING
 
 Sentry can override logger levels with the `SENTRY_LOG_LEVEL` environment variable.
 
-The value of this can be one of the [standard Python logging level strings](https://docs.python.org/2/library/logging.html#levels).
+The value of this can be one of the [standard Python logging level strings](https://docs.python.org/3/library/logging.html#logging-levels).
 
 ```shell
 SENTRY_LOG_LEVEL=WARNING sentry ...

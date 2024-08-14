@@ -1,4 +1,7 @@
-# develop
+# Sentry Developer Documentation
+
+> [!WARNING]  
+> The contents of this repository have been migrated to [getsentry/sentry-docs](https://github.com/getsentry/sentry-docs/)
 
 Welcome to [Sentry's Developer documentation](https://develop.sentry.dev)!
 
@@ -20,7 +23,7 @@ NOTES:
 
 ## Making Search Changes
 
-The search functionality is built with [Algolia](https://www.algolia.com/doc/api-client/getting-started/install/javascript/?language=javascript). If you wish to test index changes or other changes to the searching behavior. To do this you'll need to generate a production build with a special flag to write to your development environment:
+The search functionality is built with [Algolia](https://www.algolia.com/doc/api-client/getting-started/install/javascript/?language=javascript). If you wish to test index changes or other changes to the searching behavior, you'll need to generate a production build with a special flag to write to your development environment:
 
 ```
 GATSBY_ENV=development yarn gatsby build

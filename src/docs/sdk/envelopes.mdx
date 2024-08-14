@@ -402,6 +402,7 @@ file. It is always associated to an event or transaction.
     ingestion, event contexts and extra fields are extracted from this file.
   - `unreal.logs`: A plain-text log file obtained from UE4 crashes. During
     event ingestion, the last logs are extracted into event breadcrumbs.
+  - `event.view_hierarchy`: An JSON file with a predefined structure, see [RFC #33](https://github.com/getsentry/rfcs/blob/main/text/0033-view-hierarchy.md). 
 
 `content_type`
 
@@ -429,6 +430,39 @@ details.
 Item type `"sessions"` contains buckets of pre-aggregated session counts.
 
 See the <Link to="/sdk/sessions/">sessions</Link> documentation for the payload
+details.
+
+**Constraints:**
+
+- This Item may occur multiple times per Envelope.
+- Ingestion may limit the maximum number of Items per Envelope, see *Ingestion*.
+
+**Additional Item Headers:**
+
+*None*
+
+### Statsd
+
+Item type `"statsd"` contains metrics emissions in a superset of the statsd format.
+
+See the <Link to="/sdk/metrics/">metrics</Link> documentation for the payload
+details.
+
+**Constraints:**
+
+- This Item may occur multiple times per Envelope.
+- Ingestion may limit the maximum number of Items per Envelope, see *Ingestion*.
+
+**Additional Item Headers:**
+
+*None*
+
+### Metric Meta
+
+Item type `"metric_meta"` contains per-metric meta data which is persisted alongside
+metrics in the system.
+
+See the <Link to="/sdk/metrics/">metrics</Link> documentation for the payload
 details.
 
 **Constraints:**
@@ -503,6 +537,86 @@ details.
 
 *None*
 
+### Replay Event
+
+Item type `"replay_event"` contains a replay payload encoded in JSON.
+
+See the <Link to="/sdk/replays/">replays</Link> documentation for the payload
+details.
+
+**Constraints:**
+
+- This Item may occur at most once per Envelope.
+- This Item must be sent with a Replay Recording Item.
+
+**Envelope Headers:**
+
+*None*
+
+**Additional Item Headers:**
+
+*None*
+
+### Replay Recording
+
+Item type `"replay_recording"` contains a replay recording payload encoded in JSON *or* a gzipped JSON.
+
+See the <Link to="/sdk/replays/">replays</Link> documentation for the payload
+details.
+
+**Constraints:**
+
+- This Item may occur at most once per Envelope.
+- This Item must be sent with a Replay Recording Item.
+
+**Envelope Headers:**
+
+*None*
+
+**Additional Item Headers:**
+
+`length`
+
+: **integer, required.** The size of the Replay recording payload
+
+### Profile
+
+Item type `"profile"`. This Item contains a profile payload encoded
+in JSON.
+
+**Constraints:**
+
+- This Item may occur at most once per Envelope.
+- This Item needs to be in the same Envelope as the associated transaction.
+
+**Envelope Headers:**
+
+*None*
+
+**Additional Item Headers:**
+
+*None*
+
+### Check-Ins
+
+Item type `"check_in"` contains a check-in payload encoded as JSON.
+
+See the <Link to="/sdk/check-ins/">Check-Ins</Link> documentation for the payload
+details.
+
+**Constraints:**
+
+- This Item may occur at most once per Envelope.
+- This Item can either be included in an Envelope with other Items, or it may be sent by itself.
+
+**Envelope Headers:**
+
+*None*
+
+**Additional Item Headers:**
+
+*None*
+
 ### Reserved Types
 
 Reserved types may not be written by any implementation. They are reserved for
@@ -555,13 +669,17 @@ SDKs should not rely on Envelope header authentication to retain backward compat
 Event ingestion imposes limits on the size and number of Items in Envelopes.
 These limits are subject to future change and defined currently as:
 
-- *20MB* for a compressed Envelope request
-- *100MB* for a full Envelope after decompression
+- *20MB* for a compressed envelope request
+- *100MB* for a full envelope after decompression
 - *100MB* for all attachments combined
-- *100MB* for each attachment Item
-- *1MB* for event and transaction Items
-- *100 sessions* per Envelope
-- *100 pre-aggregated session buckets* per each `"sessions"` Item
+- *100MB* for each attachment item
+- *1MB* for event (errors and transactions), span, and metric (statsd, buckets, meta) items.
+- *100KB* for monitor check-in items
+- *50MB* for profile items 
+- *10MB* for compressed replay item
+- *100MB* for replay item after decompression
+- *100 sessions* per envelope
+- *100 pre-aggregated session buckets* per each `"sessions"` item
 
 ## External References
 

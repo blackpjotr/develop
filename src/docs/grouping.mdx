@@ -81,17 +81,17 @@ indicate the same error.  There is however a fundamental variance to stack trace
 fingerprint of the stack trace has some challenges associated with it.
 
 A stack trace consists of multiple frames and each frame contributes to the fingerprint.  Which parts of it
-do and which ones do not depends quite a bit on the platform and on the differnt rules we apply to it.
+do and which ones do not depends quite a bit on the platform and on the different rules we apply to it.
 
 ### Example Platform Behavior
 
 In **Python** as an example each frame contributes `module` name, `function` name and `context-line` (that is
 the source code of the line where the frame pointer pointed with leading and trailing whitespace removed).
 The motivation here is the following: modules and functions are relatively coarse indicators and a function
-can often fail from different branches, so taking the source code into account in additiona is less likely
-to over-group.  This however also means that when a refactorign takes places in a line that does not change
+can often fail from different branches, so taking the source code into account in addition is less likely
+to over-group.  This however also means that when a refactoring takes places in a line that does not change
 the functionality but the source code, it can cause a new line to be created unnecessarily.  The other
-consequences of this is also that we require source code to be available for grouping.  This works well in
+consequence of this is that we require source code to be available for grouping.  This works well in
 Python as the Python SDK generally submits the source code along, but for instance we cannot use the same
 rule in C++ for instance where the availability of the source code is not guaranteed and one release can
 come with source, whereas another one might not.
@@ -101,7 +101,7 @@ challenges with determining a reliable function name due to limitations with the
 minified function names to show up at times which are unstable between builds.  Because of this we instead
 feed `module` name, `filename` (that is the base name of the path only converted to lowercase) as well as
 the `context-line`.  This again is risky as the `context-line` might slightly change over time.  An additional
-complication with JavaScript is that the browser supplied stack trace is not guarnateed to be particularly
+complication with JavaScript is that the browser supplied stack trace is not guaranteed to be particularly
 stable.  Different browsers have very different behavior in how the stack trace looks like when browser
 native functions are involved.  For instance the use of `Array.forEach` can produce vastly different stack
 traces between browsers.  Some will show `Array.forEach` as a stack frame, some will not.  As such the grouping
@@ -147,12 +147,12 @@ existing group.
 Sentry at the moment feeds the entire stack into the group.  There is a way to limit the number of frames
 contributed down to a smaller set by setting a maximum number of frames that should be considered.  This
 has a hypothetical advantage when working with different paths that lead to a bug but have the consequence
-that very large groups can be created.  Creating larger groups is tricker in Sentry as withouth hierarchical
-groupign there are no good ways to dive into the different stacks in an issue.
+that very large groups can be created.  Creating larger groups is tricker in Sentry as without hierarchical
+grouping there are no good ways to dive into the different stacks in an issue.
 
 ## Fallback Grouping
 
-When a stack trace is unavailable rthe system needs to fall back to some sort of alternative grouping
+When a stack trace is unavailable the system needs to fall back to some sort of alternative grouping
 method.  The fallback is what we call "message based grouping" and it's a pretty limited method.  We take
 the first line of the message and apply some clean up logic.  For instance if numbers are encountered they
 are replaced by a static placeholder.  Same with known timestamps, UUIDs and similar things.  However in
@@ -167,7 +167,7 @@ hypothetical function `get_current_user`.  Let's imagine this function has a bug
 failing with a `DataConsistencyError` exception.  If we consider that this function is used in a lot of
 different places of the application, each of these callers will now create a different group.  We can thus
 think of grouping as a problem of the source of the error.  At any point the question can be asked if the
-source of the error is "how we call a function" (caller error) or "in the function" (caller error).  Making
+source of the error is "how we call a function" (caller error) or "in the function" (callee error).  Making
 this decision is impossible to make in a general sense, but over time it can be easier to make this call.
 
 Sentry has an experimental grouping system called "hierarchical" grouping where we allow diving into the
@@ -185,7 +185,7 @@ events nothing in Sentry would properly function any more.  It is thus our first
 quality of the workflow.  Unfortunately with the tools available today there we are sitting in a pretty
 tough spot at the time of grouping.  If we get it wrong, the user is likely stuck.
 
-The following general paths forward are current envisioned
+The following general paths forward are current envisioned:
 
 ## Groups of Groups
 
@@ -193,7 +193,7 @@ The consequences of making too many groups today are alert spam and the inabilit
 issues at once.  If Sentry were to no longer be alerting on all new groups and tools existed to work
 across multiple groups more opportunies arise.  In particular the grouping algorithm could continue to
 just fingerprint the stack trace but a secondary process could come in peridically and sweep up related
-finger prints into a larger group.  If we take the `get_current_user` example the creation of 50 independent
+fingerprints into a larger group.  If we take the `get_current_user` example the creation of 50 independent
 groups is not much of an issue if no alerts are fired.  If after 5 minute the system detected that they are
 in fact all very related (eg: the bug is "in `get_current_user`") it could leave the 50 generated groups
 alone but create a new group that links the other 50 groups, hide/deemphasize the individual 50 groups in

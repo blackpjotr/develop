@@ -26,16 +26,31 @@ attribute to cross-reference this thread.
 
 `crashed`
 
-: _Optional_. A flag indicating whether the thread crashed. Defaults to `false`.
+: _Optional_. A flag indicating whether the thread was the cause for the event being sent, e.g. due to a crash.
+Defaults to `false`.
 
 `current`
 
-: _Optional_. A flag indicating whether the thread was in the foreground.
+: _Optional_. A flag indicating whether the thread was in the foreground. A thread is in foreground when it's executing.
 Defaults to `false`.
+
+`main`
+
+: _Optional_. If applicable, a flag indicating whether the thread was responsible for rendering the user interface.
+On mobile platforms this is oftentimes referred to as the "main thread" or "ui thread".
 
 `name`
 
 : _Optional_. The thread name.
+
+`state`
+
+: _Optional_. State of the thread at the time of the event.
+
+`held_locks`
+
+: _Optional_. Represents a collection of locks (monitor objects) held by a thread. A dictionary of lock object memory addresses and 
+their respective lock reason/details. Lock reason corresponds to the [Lock Reason Interface](/sdk/event-payloads/lockreason/).
 
 `stacktrace`
 
@@ -59,6 +74,12 @@ other attributes for simplicity.
         "id": "0",
         "name": "main",
         "crashed": true,
+        "main": true,
+        "held_locks": {
+          "0x0d3a2f0a": {},
+          "0x07d7437b": {}
+        },
+        "state": "Waiting",
         "stacktrace": {}
       }
     ]
@@ -75,6 +96,12 @@ Or, alternatively:
       "id": "0",
       "name": "main",
       "crashed": true,
+      "main": true,
+      "held_locks": {
+        "0x0d3a2f0a": {},
+        "0x07d7437b": {}
+      },
+      "state": "Runnable",
       "stacktrace": {}
     }
   ]

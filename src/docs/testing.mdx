@@ -64,17 +64,19 @@ pytest tests/snuba/api/endpoints/test_organization_events_distribution.py::Organ
 # Run all tests in a file that match a substring
 pytest tests/snuba/api/endpoints/test_organization_events_distribution.py -k method_name
 
-# When running tests Django rebuilds the database on every run, which can make your test startup time slow. To avoid this you can use
-# the `--reuse-db` flag, so that the database will persist between runs. This should significantly improve your test startup time after
-# the first time you use it.
-# Note: If the schema changes you may need to run with `--create-db` once so that you have the latest schema.
+# When running tests Django rebuilds the database on every run, which can make
+# your test startup time slow. To avoid this you can use the `--reuse-db` flag,
+# so that the database will persist between runs. This should significantly
+# improve your test startup time after the first time you use it.
+# Note: If the schema changes you may need to run with `--create-db` once so
+# that you have the latest schema.
 pytest --reuse-db tests/sentry/api/endpoints/
 ```
 
 Some frequently used options for pytest are:
 
-* `-k` Filter test methods/classes by a substring.
-* `-s` Don't capture stdout when running tests.
+- `-k` Filter test methods/classes by a substring.
+- `-s` Don't capture stdout when running tests.
 
 Refer to the [pytest](http://doc.pytest.org/en/latest/usage.html) docs for more usage options.
 
@@ -86,10 +88,9 @@ to build up the required organization, projects and other postgres based state.
 
 You should also use `store_event()` to store events in a similar way that the
 application does in production. Storing events requires your test to inherit
-from `SnubaTestCase`.  When using `store_event()` take care to set a timestamp
-*in the past* on the event. When omitted, the timestamp is uses 'now' which can
+from `SnubaTestCase`. When using `store_event()` take care to set a timestamp
+_in the past_ on the event. When omitted, the timestamp is uses 'now' which can
 result in events not being picked due to timestamp boundaries.
-
 
 ```python
 from sentry.testutils.helpers.datetime import before_now
@@ -118,13 +119,13 @@ def test_success(self):
 
 ### Notes on Database Tests
 
-For the love of god please stop writing tests using the Django test case.  However
-if for whatever reason you are extending on of them and you do not feel motivated
-enough to convert them into function style tests be extra careful about using it
-for non database related functionality.
+For the love of god, please stop writing tests using the Django test case. However,
+if for whatever reason you are extending one of them and you do not feel motivated
+enough to convert them into function style tests, be extra careful about using it
+for non-database-related functionality.
 
-The django `TestCase` class incurs an incredibly high cost due to database management
-and we have some tests that do not require the database.  To check if your new tests
+The Django `TestCase` class incurs an incredibly high cost due to database management,
+and not all tests require the database. To check if your new tests
 are unnecessarily using the database export the `SENTRY_DETECT_TESTCASE_MISUSE`
 environment variable and set it to `1`:
 
@@ -133,7 +134,7 @@ SENTRY_DETECT_TESTCASE_MISUSE=1 pytest my_new_test.py
 ```
 
 If the test runner detects that you used the Django `TestCase` class but you did not
-end up needing it, it will yell at you.  This is protects you against other
+end up needing it, it will yell at you. This protects you against other
 developers yelling at you later for slowing down CI.
 
 ### External Services
@@ -165,30 +166,125 @@ time offsets without violating the 30 day constraint that relay imposes.
 Add the following to `conftest.py` in the project root:
 
 ```python
-import itertools
-from django.conf import settings
-from django.db import connection, connections, reset_queries
-from django.template import Template, Context
-
 @pytest.fixture(scope="function", autouse=True)
-def log_sql():
+def log_sql(request):
+    from django.conf import settings
+    from django.db import connections, reset_queries
+
     reset_queries()
     settings.DEBUG = True
 
     yield
 
-    time = sum([float(q["time"]) for q in connection.queries])
-    t = Template(
-        "{% for sql in sqllog %}{{sql.sql|safe}}{% if not forloop.last %}\n\n{% endif %}{% endfor %}"
-    )
-    queries = list(itertools.chain.from_iterable([conn.queries for conn in connections.all()]))
-    log = t.render(Context({"sqllog": queries, "count": len(queries), "time": time}))
-    print(log)
+    print(f"\nQuery Log from {request.node.nodeid}")
+    for connection in connections.all():
+        for query in connection.queries:
+            print(f"{connection.alias}: {query['sql']}")
 ```
 
 Now all SQL executed during tests will be printed to stdout. It's recommended
 to narrow down the output by using pytest's `-k` selector. Also note that
 you'll need to pass `-s` to see stdout.
+
+### Silo modes
+
+The test suite is aware of [silo modes](/architecture/#silo-modes) and by default tests will run in `REGION` mode. To have tests run in `CONTROL` mode, you can use `control_silo_test` annotation. To have tests run in all silo modes you can use `all_silo_test`:
+
+```python
+from sentry.testutils.silo import all_silo_test, control_silo_test
+
+@control_silo_test
+class UserDetailsTest(TestCase):
+    ...
+
+@all_silo_test
+class AllSiloUserDetailsTest(TestCase):
+    ...
+```
+
+You’ll often need to create or update user records when writing tests for region silo code. If you use the user model directly you’ll encounter failures related to incorrect silo boundaries. To avoid those errors you can temporarily swap the current silo assignment.
+
+```python
+from sentry.silo import SiloMode
+from sentry.testutils.silo import assume_test_silo_mode_of
+
+with assume_test_silo_mode_of(UserOption):
+    UserOption.objects.clear_local_cache()
+```
+
+The `assume_test_silo_mode_of(model)` will temporarily switch the active silo mode to match the silo mode of the model passed in. If you'd like to explicitly name the silo mode you can use `assume_test_silo_mode(SiloMode.CONTROL)` to switch into control mode.
+
+
+### Flushing outbox messages
+
+In tests if you create or update records that use asynchronous outbox messages, you can force outbox delivery and processing in tests using `outbox_runner`:
+
+```python
+from sentry.testutils.outbox import outbox_runner
+
+with outbox_runner():
+    member = OrganizationMember(
+        organization=self.organization,
+        email="foo@example.com"
+    )
+    member.token = member.generate_token()
+    member.save()
+```
+
+The above code will update a member and flush the relevant outbox messages to be delivered synchronizing data in control silo tables. You can also use `outbox_runner` in isolation to flush outbox driven state like audit logs:
+
+```python
+response = self.get_success_response(
+    self.project.organization.slug, self.project.slug, status_code=302
+)
+# Flush outboxes for audit logs
+with outbox_runner():
+    pass
+
+with assume_test_silo_mode_of(AuditLogEntry):
+    assert (
+        AuditLogEntry.objects.get(
+            organization_id=self.project.organization_id,
+            event=audit_log.get_event_id("PROJECT_EDIT"),
+        ).data.get("old_slug")
+        == self.project.slug
+    )
+```
+
+### Transaction Safety
+
+By default the test suite will validate a few data consistency and safety constraints. The disallowed operations are:
+
+1. Transactions cannot span database connections. We do not allow a transaction to contain changes on a different database connection. For example a model on the `default` and `crons` database connections cannot participate in a transaction.
+2. Transactions cannot include RPC calls. Because RPC calls can span the network, they cannot participate in a transaction.
+3. Any model using outboxes cannot be modified with `QuerySet.update()` or other update operations that would not generate outboxes.
+
+### Disabling transaction safety
+
+While the transaction safety tooling provides a good foundation, there are scenarios where we need to bypass these checks. An example of this is performing a read-only RPC call within a transaction, or mutating a record to reproduce invalid states. 
+To bypass an outbox consistency check use `unguarded_write`:
+
+```python
+from sentry.silo import unguarded_write
+
+with unguarded_write(using=router.db_for_write(User)):
+    user.update(name="sara")
+
+```
+
+To bypass a RPC-within-transaction check use `in_test_hide_transaction_boundary`:
+
+```python
+from sentry.db.postgres.transactions import in_test_hide_transaction_boundary
+
+with in_test_hide_transaction_boundary():
+    users = user_service.get_many(filter={"user_ids": list(owners)})
+```
+
+<Alert type="warning">
+Bypassing safety checks is not recommended and usage can cause consistency
+issues and data loss.
+</Alert>
 
 ## Acceptance Tests
 
@@ -217,6 +313,13 @@ pytest tests/acceptance/test_organization_group_index.py \
     --no-headless=true \
     -k test_with_onboarding
 
+# Run the browser with an artificially slow network (useful for debugging
+# flakey tests).
+pytest tests/acceptance/test_organization_group_index.py \
+    --no-headless=true \
+    --slow-network=true \
+    -k test_with_onboarding
+
 # Open each snapshot image
 SENTRY_SCREENSHOT=1 VISUAL_SNAPSHOT_ENABLE=1 \
     pytest tests/acceptance/test_organization_group_index.py \
@@ -239,23 +342,6 @@ tests.
 All of our data is loaded asynchronously into the front-end and acceptance tests need to account for
 various latencies and response times. We favour using selenium's `wait_until*` features to poll the DOM
 until elements are present or visible. We do not use `sleep()`.
-
-### Visual Regression
-
-Pixels Matter and because of that we use visual regressions to help catch
-unintended changes to how Sentry is rendered. During acceptance tests we capture
-screenshots and compare the screenshots in your pull request to approved
-baselines.
-
-While we have fairly wide coverage with visual regressions there are a few
-important blind spots:
-
-* Hover cards and hover states
-* Modal windows
-* Charts and data visualizations
-
-All of these components and interactions are generally not included in visual snapshots, and you should take care
-when working on any of them.
 
 #### Dealing with always changing data
 
@@ -282,11 +368,8 @@ yarn test tests/js/spec/views/issueList/overview.spec.js
 ### API Fixtures
 
 Because our Jest tests run without an API we have a variety of fixture builders available to help generate
-API response payloads. The `TestStubs` global includes all the fixture functions in `tests/js/sentry-test/fixtures/`.
+API response payloads. They are available for import with the alias `sentry-fixture/*`. New fixtures can be created 
+inside of `sentry/fixtures/js-stubs/`.
 
 You should also use `MockApiClient.addMockResponse()` to set responses for API calls your components will make. Failing
 to mock an endpoint will result in tests failing.
-
-### Kafka Tests in CI
-
-The Snuba test suite (`.github/workflows/snuba-integration-test.yml`) is the only test suite that will actually have Kafka running in CI. If you have a test that needs Kafka running then those tests need to be nested under the Snuba test folder (`tests/snuba/`). If you don't, your tests will timeout and be cancelled in GH actions. 
